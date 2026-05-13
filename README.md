@@ -1,164 +1,191 @@
-<h1 align="left">
-  <img src="assets/InfiniteVGGT_Logo.jpg" alt="Logo" height="40px" style="vertical-align: middle;">
-  <span style="vertical-align: middle;">InfiniteVGGT: Visual Geometry Grounded Transformer for Endless Streams</span>
-</h1>
+# GHOST
 
-<div align="center">
-    <p>
-        <a>
-            <img src="assets/autolab_logo.png" alt="Autolab Logo" height="50" align="middle">
-        </a>
-        &nbsp;&nbsp;
-        <a href="https://github.com/Henryyuan429">Shuai Yuan,</a><sup>1</sup>&nbsp;&nbsp;
-        <a href="https://github.com/YantaiYang-05">Yantai Yang,</a><sup>1, 2</sup>&nbsp;&nbsp;
-        <a>Xiaotian Yang,</a><sup>1</sup>&nbsp;&nbsp;
-        <a>Xupeng Zhang,</a><sup>1</sup>&nbsp;&nbsp;
-        <br>
-        <a>Zhonghao Zhao,</a><sup>1</sup>&nbsp;&nbsp;
-        <a>Lingming Zhang,</a><sup></sup>&nbsp;&nbsp;
-        <a href="https://zhipengzhang.cn/">Zhipeng Zhang</a><sup>1 ✉</sup>&nbsp;&nbsp;
-    </p>
-     <p>
-        <sup>1</sup><a>AutoLab, School of Artificial Intelligence, Shanghai Jiao Tong University</a>&nbsp;&nbsp;
-        <br>
-        <sup>2</sup><a>Anyverse Dynamics</a>
-    </p>
-    <p>
-        <sup>✉</sup> Corresponding Author
-    </p>
-</div>
+**GHOST** is a causal visual geometry transformer that extends [VGGT](https://github.com/facebookresearch/vggt) with a training-free rolling KV-cache memory, enabling stable, infinite-horizon streaming 3D reconstruction from continuous image sequences.
 
-<p align="center">
-    <a href="https://arxiv.org/abs/2601.02281v1"><img src="https://img.shields.io/badge/arXiv-InfiniteVGGT-red?logo=arxiv" alt="Paper PDF"></a>
-    <a href="https://huggingface.co/papers/2601.02281"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging_Face-InfiniteVGGT-yellow" alt="Hugging Face"></a>
+Key features:
+- Unbounded streaming inference with bounded GPU memory via importance-based KV cache eviction
+- Cosine-similarity-guided per-layer budget allocation
+- Alternating frame/global attention for joint per-frame and cross-frame reasoning
+- Evaluated on **7-Scenes** and **NRGBD** benchmarks
 
+---
 
-<p align="center">
-<img src="assets/InfiniteVGGT.gif" width="70%">
-</p>
-<p>
-    <i> Achieving higher reconstruction quality and more accurate camera pose estimation using thousands of frames input.</i>
-</p>
+## Environment Setup
 
-## 📰 News
-- [Jan 6 , 2026] Paper release.
-- [Jan 6 , 2026] Code release.
-- [Jan 19 , 2026] Long3D dataset release.
+**Requirements:** Python 3.11, CUDA 12.x, PyTorch 2.3.1
 
-## 🔍 Recommendation
-- Welcome to check out our previous collaborative work [FastVGGT](https://github.com/mystorm16/FastVGGT).
-
-
-## 📖 Overview
-We propose **InfiniteVGGT**, a causal visual geometry transformer that utilizes a training-free rolling memory mechanism to enable stable, infinite-horizon streaming, and introduce the **Long3D** benchmark to rigorously evaluate long-term continuous 3D geometry performance.
-Our main contributions are summarized as follows:
-
-1. An unbounded memory architecture InfiniteVGGT for continuous 3D geometry understanding, built on a novel, dynamic, and interpretable explicit memory system.
-2. State-of-the-art performance on long-sequence benchmarks and a unique capability for robust, infinite-horizon reconstruction without memory overflow.
-3. The Long3D benchmark, a new dataset for the rigorous evaluation of long-term performance, addressing a critical gap in the field.
-
-<div align="center">
-    <a>
-        <img src="assets/method.png" width="90%">
-    </a>
-</div>
-
-
-## 🌍 Installation
-
-1. Clone InfiniteVGGT
 ```bash
-git clone https://github.com/AutoLab-SAI-SJTU/InfiniteVGGT.git
-cd InfiniteVGGT
-```
-2. Create conda environment
-```bash
-conda create -n infinitevggt python=3.11 cmake=3.14.0
-conda activate infinitevggt 
-```
+# 1. Clone the repository
+git clone https://github.com/lokiniuniu/GHOST.git
+cd GHOST
 
-3. Install requirements
-```bash
+# 2. Create a conda environment
+conda create -n ghost python=3.11 cmake=3.14.0
+conda activate ghost
+
+# 3. Install Python dependencies
 pip install -r requirements.txt
+
+# 4. (macOS / some Linux) Fix OpenMP conflict
 conda install 'llvm-openmp<16'
 ```
 
-4. Download the StreamVGGT pretrained [checkpoint](https://huggingface.co/lch01/StreamVGGT) and place it to ./ckpt directory.
+> **Optional:** Install [`flash-kmeans`](https://github.com/cloneofsimo/flash-kmeans) for 2–5× faster KV cache quantization encoding:
+> ```bash
+> pip install flash-kmeans
+> ```
 
+---
 
-## ▶️ Run Inference
+## Model Weights
+
+Download the pretrained **StreamVGGT** checkpoint from Hugging Face and place it under `./ckpt/`:
+
 ```bash
-# Run on your own data
-python run_inference.py --input_dir path/to/your/images_dir
+# Using huggingface-hub CLI
+pip install -U huggingface_hub
+huggingface-cli download lch01/StreamVGGT --local-dir ./ckpt
+```
 
-# Run long sequence and store the result to directory for each frame
+Or download manually from: https://huggingface.co/lch01/StreamVGGT
+
+The checkpoint file should be at `./ckpt/model.pth` (or pass the path explicitly via `--checkpoint_path`).
+
+---
+
+## Dataset Download
+
+### 7-Scenes
+
+Download from the [official 7-Scenes page](https://www.microsoft.com/en-us/research/project/rgb-d-dataset-7-scenes/) and place under `./7scenes/`.
+
+### NRGBD
+
+Download from [neural-rgbd-surface-reconstruction](https://github.com/dazinovic/neural-rgbd-surface-reconstruction) and place under `./datasets/nrgbd/`.
+
+---
+
+## Running Inference
+
+```bash
+# Basic inference on a folder of images
+python run_inference.py --input_dir path/to/images/ --checkpoint_path ./ckpt/model.pth
+
+# Long sequences: stream frame-by-frame and write results to disk (avoids OOM)
 python run_inference.py \
-    --input_dir path/to/your/images_dir \
-    --frame_cache_dir path/to/your/results_perframe_dir \
+    --input_dir path/to/images/ \
+    --checkpoint_path ./ckpt/model.pth \
+    --frame_cache_dir path/to/output_per_frame/ \
     --no_cache_results
 ```
 
-## 🚀 Run Demo
-We provide demo code based on the [NRGBD](https://github.com/dazinovic/neural-rgbd-surface-reconstruction) dataset. You can run it using the following command:
+---
+
+## Evaluation
+
+### 7-Scenes / NRGBD
 
 ```bash
-python demo_viser.py  \
-    --seq_path path/to/nrgbd/image_sequence \
-    --frame_interval 10 \
-    --gt_path path/to/nrgbd/gt_camera (Optional)
+cd src
+python -m accelerate.commands.launch eval/mv_recon/launch.py \
+    --weights ../ckpt/model.pth \
+    --model_name StreamVGGT \
+    --dataset 7scenes \
+    --scenes_root ../7scenes \
+    --output_dir ../outputs/7scenes
 ```
 
-## 🧊 Long3D Dataset
+**Key evaluation options:**
 
-The **Long3D Dataset** is a benchmark designed for long-sequence 3D scene reconstruction. It provides 10Hz image streams paired with dense ground truth point clouds.
-
-### 📊 Data Description
-
-| File Name | Description |
-| :--- | :--- |
-| **`image.7z`** | Continuous image stream data captured at a frequency of 10 Hz. |
-| **`dense_cloud_map.pcd`** | Global ground truth point clouds, acquired via a 3D spatial scanner. |
+| Argument | Default | Description |
+|---|---|---|
+| `--dataset` | `7scenes` | `7scenes`, `nrgbd`, or `all` |
+| `--total_budget` | `1200000` | Total KV token budget across all layers |
+| `--use_cosine_budget` | `True` | Use cosine-similarity-based per-layer budget allocation |
+| `--eviction_mode` | `importance` | KV eviction strategy (importance-based) |
+| `--importance_weights_path` | *(default)* | Path to custom importance weights JSON; defaults to `configs/importance_weights_default.json` |
+| `--max_frames` | `None` | Limit number of frames per sequence |
 
 ---
-### 📥 Download Instructions
 
-#### Option1: Hugging Face CLI:
+## Project Structure
 
-The most efficient way to download the dataset is using the huggingface-hub CLI. Ensure you have the library installed (`pip install -U huggingface_hub`).
 ```
-# export HF_ENDPOINT=https://hf-mirror.com
-hf download --repo-type dataset \
-    --resume-download AutoLab-SJTU/Long3D \
-    --local-dir ./Long3D
+GHOST/
+├── run_inference.py              # Main inference entry point
+├── requirements.txt              # Python dependencies
+├── configs/
+│   ├── importance_weights_default.json    # Default importance eviction weights
+│   └── kv_budget_proportions_cosine.json  # Per-layer KV budget proportions
+├── scripts/                      # Utility shell scripts
+└── src/
+    ├── add_ckpt_path.py           # Helper to resolve checkpoint paths
+    ├── visual_util.py             # Visualization utilities
+    ├── streamvggt/
+    │   ├── models/
+    │   │   ├── streamvggt.py      # Main model
+    │   │   └── aggregator.py      # Alternating frame/global attention aggregator
+    │   ├── layers/
+    │   │   ├── attention.py       # Attention with KV cache and importance eviction
+    │   │   ├── block.py           # Transformer block
+    │   │   ├── vision_transformer.py
+    │   │   ├── rope.py            # Rotary position embedding
+    │   │   ├── patch_embed.py
+    │   │   ├── mlp.py
+    │   │   └── swiglu_ffn.py
+    │   ├── heads/
+    │   │   ├── camera_head.py
+    │   │   ├── dpt_head.py
+    │   │   ├── track_head.py
+    │   │   └── track_modules/
+    │   ├── eviction/
+    │   │   ├── importance_eviction.py          # Importance scoring functions
+    │   │   └── importance_weights_from_hyperparams.py
+    │   ├── quantization/          # KV cache quantization (optional)
+    │   ├── kernels/               # Custom CUDA/sparse attention kernels
+    │   └── utils/
+    ├── eval/
+    │   └── mv_recon/              # Multi-view reconstruction evaluation
+    │       ├── launch.py
+    │       ├── data.py
+    │       ├── compute_kv_budget_from_cosine_sim.py
+    │       └── compute_kv_budget_strategies.py
+    ├── dust3r/                    # DUSt3R geometry utilities
+    ├── croco/                     # CroCo backbone utilities
+    └── vggt/                      # Original VGGT model (reference)
 ```
-#### Option2: Manual Access:
 
-Alternatively, you can browse and download files directly from the [Long3D](https://huggingface.co/datasets/AutoLab-SJTU/Long3D) dataset.
+---
 
-## 📋 Checklist
-- [ √ ] Release the Dataset.
+## Acknowledgements
 
-## 🙏 Acknowledgement
-We would like to acknowledge the following open-source projects that served as a foundation for our implementation:
+This project builds on top of the following open-source work:
 
-[DUSt3R](https://github.com/naver/dust3r)
-[CUT3R](https://github.com/CUT3R/CUT3R)
-[VGGT](https://github.com/facebookresearch/vggt)
-[Point3R](https://github.com/YkiWu/Point3R)
-[StreamVGGT](https://github.com/wzzheng/StreamVGGT)
-[FastVGGT](https://github.com/mystorm16/FastVGGT)
-[TTT3R](https://github.com/Inception3D/TTT3R)
+- [DUSt3R](https://github.com/naver/dust3r)
+- [VGGT](https://github.com/facebookresearch/vggt)
+- [StreamVGGT](https://github.com/wzzheng/StreamVGGT)
+- [CUT3R](https://github.com/CUT3R/CUT3R)
+- [Point3R](https://github.com/YkiWu/Point3R)
+- [FastVGGT](https://github.com/mystorm16/FastVGGT)
+- [TTT3R](https://github.com/Inception3D/TTT3R)
 
-Many thanks to these authors!
+---
 
-## 📜 Citation
+## Citation
 
-If you incorporate our work into your research, please cite:
-```
-@misc{yuan2026infinitevggt,
-        title={InfiniteVGGT: Visual Geometry Grounded Transformer for Endless Streams}, 
-        author={Shuai Yuan and Yantai Yang and Xiaotian Yang and Xupeng Zhang and Zhonghao Zhao and Lingming Zhang and Zhipeng Zhang},
-        journal={arXiv preprint arXiv:2601.02281},
-        year={2026}
+Citation information will be released soon.
+
+```bibtex
+@misc{ghost2026,
+  title={GHOST},
+  author={TBD},
+  year={2026},
+  note={Citation coming soon}
 }
 ```
+
+---
+
+## License
+
+See [LICENSE.txt](LICENSE.txt).

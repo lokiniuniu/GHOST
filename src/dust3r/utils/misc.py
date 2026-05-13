@@ -109,6 +109,15 @@ def transposed(dic):
 def invalid_to_nans(arr, valid_mask, ndim=999):
     if valid_mask is not None:
         arr = arr.clone()
+        if valid_mask.shape != arr.shape:
+            # Broadcast mask to match arr. Mask is (H,W) or (B,H,W), arr is (B,H,W) or (B,H,W,C).
+            has_channel = valid_mask.dim() < arr.dim() and arr.shape[-1] in (3, 4)
+            n_leading = arr.dim() - valid_mask.dim() - (1 if has_channel else 0)
+            for _ in range(max(0, n_leading)):
+                valid_mask = valid_mask.unsqueeze(0)
+            if has_channel:
+                valid_mask = valid_mask.unsqueeze(-1)
+            valid_mask = valid_mask.expand_as(arr)
         arr[~valid_mask] = float("nan")
     if arr.ndim > ndim:
         arr = arr.flatten(-2 - (arr.ndim - ndim), -2)

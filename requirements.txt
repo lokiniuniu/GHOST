@@ -15,7 +15,6 @@ trimesh
 tensorboard
 pyglet<2
 viser
-gradio
 lpips
 hydra-core
 h5py
@@ -25,3 +24,6 @@ scikit-learn
 gsplat
 evo
 open3d
+
+# [Optional] flash-kmeans for faster KV cache encoding (2-5x k-means speedup)
+# pip install flash-kmeans

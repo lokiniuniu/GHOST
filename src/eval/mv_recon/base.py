@@ -113,10 +113,16 @@ class BaseStereoViewDataset:
             assert np.isfinite(
                 view["depthmap"]
             ).all(), f"NaN in depthmap for view {view_name(view)}"
-            pts3d, valid_mask = depthmap_to_absolute_camera_coordinates(**view)
-
-            view["pts3d"] = pts3d
-            view["valid_mask"] = valid_mask & np.isfinite(pts3d).all(axis=-1)
+            # Long3D: thousands of frames per scene; full per-pixel pts3d is unused in launch.py
+            # (metrics use pred vs lidar GT) and exhausts host RAM. Use placeholders.
+            if view.get("dataset") == "long3d":
+                H, W = view["depthmap"].shape
+                view["pts3d"] = np.zeros((H, W, 3), dtype=np.float32)
+                view["valid_mask"] = np.ones((H, W), dtype=bool)
+            else:
+                pts3d, valid_mask = depthmap_to_absolute_camera_coordinates(**view)
+                view["pts3d"] = pts3d
+                view["valid_mask"] = valid_mask & np.isfinite(pts3d).all(axis=-1)
 
             # check all datatypes
             for key, val in view.items():

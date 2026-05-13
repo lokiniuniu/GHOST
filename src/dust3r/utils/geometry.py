@@ -185,6 +185,7 @@ def depthmap_to_camera_coordinates(depthmap, camera_intrinsics, pseudo_focal=Non
         pointmap of absolute coordinates (HxWx3 array), and a mask specifying valid pixels.
     """
     camera_intrinsics = np.float32(camera_intrinsics)
+    depthmap = np.asarray(depthmap, dtype=np.float32)
     H, W = depthmap.shape
 
     assert camera_intrinsics[0, 1] == 0.0
@@ -198,7 +199,9 @@ def depthmap_to_camera_coordinates(depthmap, camera_intrinsics, pseudo_focal=Non
     cu = camera_intrinsics[0, 2]
     cv = camera_intrinsics[1, 2]
 
-    u, v = np.meshgrid(np.arange(W), np.arange(H))
+    u, v = np.meshgrid(
+        np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing="xy"
+    )
     z_cam = depthmap
     x_cam = (u - cu) * z_cam / fu
     y_cam = (v - cv) * z_cam / fv

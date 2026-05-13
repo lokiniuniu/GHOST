@@ -11,6 +11,10 @@ import eval.mv_recon.dataset_utils.cropping as cropping
 import imageio.v3 as iio
 from tifffile import tifffile
 from einops import rearrange
+try:
+    import py7zr
+except Exception:
+    py7zr = None
 
 
 def shuffle_deque(dq, seed=None):
@@ -123,9 +127,9 @@ class SevenScenes(BaseStereoViewDataset):
     def _get_views(self, idx, resolution, rng):
 
         if self.tuple_list is not None:
-            line = self.tuple_list[idx].split(" ")
+            line = self.tuple_list[idx].split()
             scene_id = line[0]
-            img_idxs = line[1:]
+            img_idxs = [x for x in line[1:] if x]
 
         else:
             scene_id = self.scene_list[idx // self.num_seq]
@@ -555,6 +559,7 @@ class NRGBD(BaseStereoViewDataset):
         rebuttal=False,
         shuffle_seed=-1,
         kf_every=1,
+        max_frames=None,
         *args,
         ROOT,
         **kwargs,
@@ -572,6 +577,7 @@ class NRGBD(BaseStereoViewDataset):
         self.seq_id = seq_id
         self.rebuttal = rebuttal
         self.shuffle_seed = shuffle_seed
+        self.max_frames = max_frames
 
         # load all scenes
         self.load_all_tuples(tuple_list)
@@ -629,16 +635,23 @@ class NRGBD(BaseStereoViewDataset):
     def _get_views(self, idx, resolution, rng):
 
         if self.tuple_list is not None:
-            line = self.tuple_list[idx].split(" ")
+            line = self.tuple_list[idx].split()
             scene_id = line[0]
-            img_idxs = line[1:]
+            img_idxs = [x for x in line[1:] if x]
 
         else:
             scene_id = self.scene_list[idx // self.num_seq]
 
             num_files = len(os.listdir(os.path.join(self.ROOT, scene_id, "images")))
             img_idxs = [f"{i}" for i in range(num_files)]
-            img_idxs = img_idxs[:: min(self.kf_every, len(img_idxs) // 2)]
+            stride = max(1, int(self.kf_every))
+            img_idxs = img_idxs[::stride]
+
+            # Keep exactly max_frames views when possible by uniformly sampling
+            # the strided sequence (preserves full temporal coverage).
+            if self.max_frames is not None and len(img_idxs) > self.max_frames:
+                sample_ids = np.linspace(0, len(img_idxs) - 1, self.max_frames, dtype=int)
+                img_idxs = [img_idxs[i] for i in sample_ids.tolist()]
 
         fx, fy, cx, cy = 554.2562584220408, 554.2562584220408, 320, 240
         intrinsics_ = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
@@ -698,4 +711,148 @@ class NRGBD(BaseStereoViewDataset):
                 )
             )
 
+        return views
+
+
+class Long3D(BaseStereoViewDataset):
+    def __init__(
+        self,
+        num_seq=1,
+        full_video=True,
+        kf_every=1,
+        max_frames=None,
+        test_id=None,
+        extract_missing=True,
+        *args,
+        ROOT,
+        **kwargs,
+    ):
+        self.ROOT = ROOT
+        super().__init__(*args, **kwargs)
+        self.num_seq = num_seq
+        self.full_video = full_video
+        self.kf_every = kf_every
+        self.max_frames = max_frames
+        self.test_id = test_id
+        self.extract_missing = extract_missing
+        self._long3d_readable_names: dict[str, list[str]] = {}
+        self.load_all_scenes(ROOT)
+
+    def __len__(self):
+        return len(self.scene_list) * self.num_seq
+
+    def load_all_scenes(self, base_dir):
+        scenes = [
+            d
+            for d in os.listdir(base_dir)
+            if os.path.isdir(os.path.join(base_dir, d)) and not d.startswith(".")
+        ]
+        if self.test_id is not None:
+            self.scene_list = [self.test_id]
+        else:
+            self.scene_list = sorted(scenes)
+        print(f"Found {len(self.scene_list)} Long3D scenes in split {self.split}")
+
+    def _ensure_images_extracted(self, scene_dir):
+        img_dir = osp.join(scene_dir, "images", "scan_images")
+        if osp.isdir(img_dir) and len(os.listdir(img_dir)) > 0:
+            return img_dir
+
+        if not self.extract_missing:
+            return img_dir
+
+        archive_path = osp.join(scene_dir, "images.7z")
+        if not osp.isfile(archive_path):
+            return img_dir
+        if py7zr is None:
+            raise ImportError(
+                "py7zr is required to extract Long3D images.7z. "
+                "Install py7zr or pre-extract archives."
+            )
+        print(f"[Long3D] extracting {archive_path} ...")
+        with py7zr.SevenZipFile(archive_path, "r") as zf:
+            zf.extractall(path=scene_dir)
+        return img_dir
+
+    def _get_views(self, idx, resolution, rng):
+        scene_id = self.scene_list[idx // self.num_seq]
+        scene_dir = osp.join(self.ROOT, scene_id)
+        img_dir = self._ensure_images_extracted(scene_dir)
+
+        if not osp.isdir(img_dir):
+            raise FileNotFoundError(f"Long3D image directory not found: {img_dir}")
+
+        if img_dir not in self._long3d_readable_names:
+            raw_names = sorted(
+                [n for n in os.listdir(img_dir) if n.lower().endswith((".jpg", ".jpeg", ".png"))]
+            )
+            valid_names: list[str] = []
+            for n in raw_names:
+                p = osp.join(img_dir, n)
+                try:
+                    if osp.getsize(p) == 0:
+                        print(f"[Long3D][WARN] skip empty image: {p}")
+                        continue
+                    imread_cv2(p)
+                    valid_names.append(n)
+                except Exception as e:
+                    print(f"[Long3D][WARN] skip unreadable image {p}: {e}")
+            if len(valid_names) == 0:
+                raise RuntimeError(f"No readable images found in {img_dir}")
+            self._long3d_readable_names[img_dir] = valid_names
+        image_names = self._long3d_readable_names[img_dir]
+
+        if len(image_names) == 0:
+            raise RuntimeError(f"No images found in {img_dir}")
+
+        image_names = image_names[:: max(1, int(self.kf_every))]
+        if self.max_frames is not None and self.max_frames > 0 and len(image_names) > self.max_frames:
+            sample_ids = np.linspace(0, len(image_names) - 1, self.max_frames, dtype=int)
+            image_names = [image_names[i] for i in sample_ids.tolist()]
+
+        views = []
+        for image_name in image_names:
+            impath = osp.join(img_dir, image_name)
+            rgb_image = imread_cv2(impath)
+            h, w = rgb_image.shape[:2]
+
+            # Long3D does not provide per-frame depth/pose GT in the same format as 7scenes/NRGBD.
+            # Use dummy depth + identity pose to satisfy dataset interface for model inference.
+            depthmap = np.ones((h, w), dtype=np.float32)
+            fx = fy = float(max(h, w))
+            cx = (w - 1) * 0.5
+            cy = (h - 1) * 0.5
+            intrinsics_ = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
+            camera_pose = np.eye(4, dtype=np.float32)
+
+            if resolution != (224, 224):
+                rgb_image, depthmap, intrinsics = self._crop_resize_if_necessary(
+                    rgb_image, depthmap, intrinsics_, resolution, rng=rng, info=impath
+                )
+            else:
+                rgb_image, depthmap, intrinsics = self._crop_resize_if_necessary(
+                    rgb_image, depthmap, intrinsics_, (512, 384), rng=rng, info=impath
+                )
+                W, H = rgb_image.size
+                cx2 = W // 2
+                cy2 = H // 2
+                l, t = cx2 - 112, cy2 - 112
+                r, b = cx2 + 112, cy2 + 112
+                crop_bbox = (l, t, r, b)
+                rgb_image, depthmap, intrinsics = cropping.crop_image_depthmap(
+                    rgb_image, depthmap, intrinsics, crop_bbox
+                )
+
+            stem = osp.splitext(image_name)[0]
+            views.append(
+                dict(
+                    img=rgb_image,
+                    depthmap=depthmap,
+                    camera_pose=camera_pose,
+                    camera_intrinsics=intrinsics,
+                    dataset="long3d",
+                    label=osp.join(scene_id, stem),
+                    instance=impath,
+                )
+            )
         return views

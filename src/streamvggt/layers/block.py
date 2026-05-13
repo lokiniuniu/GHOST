@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Callable, List, Any, Tuple, Dict, Union
+from typing import Callable, List, Any, Tuple, Dict, Union, Optional
 import warnings
 
 import torch
@@ -68,22 +68,77 @@ class Block(nn.Module):
 
         self.sample_drop_ratio = drop_path
 
-    def forward(self, x: Tensor, pos=None, attn_mask=None, past_key_values=None, use_cache=False, cache_budget=None) -> Union[Tensor, Tuple[Tensor, Dict]]:
+    def forward(self, x: Tensor, pos=None, attn_mask=None, past_key_values=None, use_cache=False, cache_budget=None, frame_idx=None, chunk_size=1, timing_dict=None, num_special_tokens=0, num_anchor_frames=3, special_token_offset=0, fixed_exempt_from_budget=False, return_attn_weights=False, importance_scores=None, importance_cache=None, use_importance_in_attn: bool = False, softmax_importance_before_k: bool = False, debug_importance_in_attn: bool = False, layer_idx: Optional[int] = None, prev_layer_kv: Optional[Tuple[Tensor, Tensor]] = None, kv_share_cfg: Optional[Dict[str, Any]] = None, use_flex_attention: bool = False, flex_block_size: int = 128, flex_compile_mode: str = "fullgraph", sparse_kv_cfg: Optional[Dict[str, Any]] = None, motivation_kv_probe: Optional[Dict[str, Any]] = None) -> Union[Tensor, Tuple[Tensor, Dict]]:
             
-        def attn_residual_func(x: Tensor, pos=None, attn_mask=None, past_key_values=None, use_cache=False, cache_budget=None) -> Union[Tensor, Tuple[Tensor, Dict]]:
+        def attn_residual_func(x: Tensor, pos=None, attn_mask=None, past_key_values=None, use_cache=False, cache_budget=None, frame_idx=None, chunk_size=1, timing_dict=None, num_special_tokens=0, num_anchor_frames=3, special_token_offset=0, fixed_exempt_from_budget=False, return_attn_weights=False, importance_scores=None, importance_cache=None, use_importance_in_attn: bool = False, softmax_importance_before_k: bool = False, debug_importance_in_attn: bool = False, layer_idx: Optional[int] = None, prev_layer_kv: Optional[Tuple[Tensor, Tensor]] = None, kv_share_cfg: Optional[Dict[str, Any]] = None, use_flex_attention: bool = False, flex_block_size: int = 128, flex_compile_mode: str = "fullgraph", sparse_kv_cfg: Optional[Dict[str, Any]] = None, motivation_kv_probe: Optional[Dict[str, Any]] = None) -> Union[Tensor, Tuple[Tensor, Dict]]:
             if use_cache:
-                output, new_kv, scores = self.attn(self.norm1(x), pos=pos, past_key_values=past_key_values, use_cache=True, cache_budget=cache_budget)
+                out = self.attn(
+                    self.norm1(x), pos=pos, past_key_values=past_key_values,
+                    use_cache=True, cache_budget=cache_budget,
+                    frame_idx=frame_idx, chunk_size=chunk_size,
+                    timing_dict=timing_dict,
+                    num_special_tokens=num_special_tokens,
+                    num_anchor_frames=num_anchor_frames,
+                    special_token_offset=special_token_offset,
+                    fixed_exempt_from_budget=fixed_exempt_from_budget,
+                    return_attn_weights=return_attn_weights,
+                    importance_scores=importance_scores,
+                    importance_cache=importance_cache,
+                    use_importance_in_attn=use_importance_in_attn,
+                    softmax_importance_before_k=softmax_importance_before_k,
+                    debug_importance_in_attn=debug_importance_in_attn,
+                    layer_idx=layer_idx,
+                    prev_layer_kv=prev_layer_kv,
+                    kv_share_cfg=kv_share_cfg,
+                    use_flex_attention=use_flex_attention,
+                    flex_block_size=flex_block_size,
+                    flex_compile_mode=flex_compile_mode,
+                    sparse_kv_cfg=sparse_kv_cfg,
+                    motivation_kv_probe=motivation_kv_probe,
+                )
+                if return_attn_weights and len(out) == 4:
+                    output, new_kv, scores, attn_w = out
+                    return self.ls1(output), new_kv, scores, attn_w
+                output, new_kv, scores = out
                 return self.ls1(output), new_kv, scores
             else:
                 if attn_mask is not None:
-                    return self.ls1(self.attn(self.norm1(x), pos=pos, attn_mask=attn_mask))
+                    return self.ls1(self.attn(self.norm1(x), pos=pos, attn_mask=attn_mask, sparse_kv_cfg=sparse_kv_cfg))
                 else:
-                    return self.ls1(self.attn(self.norm1(x), pos=pos))
+                    return self.ls1(self.attn(self.norm1(x), pos=pos, sparse_kv_cfg=sparse_kv_cfg))
         def ffn_residual_func(x: Tensor) -> Tensor:
             return self.ls2(self.mlp(self.norm2(x)))
         
         if use_cache:
-            attn_output, new_kv, scores = attn_residual_func(x, pos=pos, past_key_values=past_key_values, use_cache=True, cache_budget=cache_budget)
+            out = attn_residual_func(
+                x, pos=pos, past_key_values=past_key_values, use_cache=True,
+                cache_budget=cache_budget, frame_idx=frame_idx, chunk_size=chunk_size,
+                timing_dict=timing_dict,
+                num_special_tokens=num_special_tokens,
+                num_anchor_frames=num_anchor_frames,
+                special_token_offset=special_token_offset,
+                fixed_exempt_from_budget=fixed_exempt_from_budget,
+                return_attn_weights=return_attn_weights,
+                importance_scores=importance_scores,
+                importance_cache=importance_cache,
+                use_importance_in_attn=use_importance_in_attn,
+                softmax_importance_before_k=softmax_importance_before_k,
+                debug_importance_in_attn=debug_importance_in_attn,
+                layer_idx=layer_idx,
+                prev_layer_kv=prev_layer_kv,
+                kv_share_cfg=kv_share_cfg,
+                use_flex_attention=use_flex_attention,
+                flex_block_size=flex_block_size,
+                flex_compile_mode=flex_compile_mode,
+                sparse_kv_cfg=sparse_kv_cfg,
+                motivation_kv_probe=motivation_kv_probe,
+            )
+            if len(out) == 4:
+                attn_output, new_kv, scores, attn_w = out
+                x = x + attn_output
+                x = x + ffn_residual_func(x)
+                return x, new_kv, scores, attn_w
+            attn_output, new_kv, scores = out
             x = x + attn_output
             x = x + ffn_residual_func(x)
             return x, new_kv, scores
@@ -102,10 +157,28 @@ class Block(nn.Module):
                 sample_drop_ratio=self.sample_drop_ratio,
             )
         elif self.training and self.sample_drop_ratio > 0.0:
-            x = x + self.drop_path1(attn_residual_func(x, pos=pos, attn_mask=attn_mask))
+            x = x + self.drop_path1(
+                attn_residual_func(
+                    x,
+                    pos=pos,
+                    attn_mask=attn_mask,
+                    use_flex_attention=use_flex_attention,
+                    flex_block_size=flex_block_size,
+                    flex_compile_mode=flex_compile_mode,
+                    sparse_kv_cfg=sparse_kv_cfg,
+                )
+            )
             x = x + self.drop_path1(ffn_residual_func(x))  # FIXME: drop_path2
         else:
-            x = x + attn_residual_func(x, pos=pos, attn_mask=attn_mask)
+            x = x + attn_residual_func(
+                x,
+                pos=pos,
+                attn_mask=attn_mask,
+                use_flex_attention=use_flex_attention,
+                flex_block_size=flex_block_size,
+                flex_compile_mode=flex_compile_mode,
+                sparse_kv_cfg=sparse_kv_cfg,
+            )
             x = x + ffn_residual_func(x)
         return x
 

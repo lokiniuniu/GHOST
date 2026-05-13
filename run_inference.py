@@ -31,7 +31,7 @@ def run_inference(args: argparse.Namespace):
         print("Error: CUDA device not available.")
         return
 
-    print("Initializing and loading StreamVGGT model ...")
+    print("Initializing and loading GHOST model ...")
 
     if not os.path.exists(args.checkpoint_path):
         print(f"Error: Checkpoint file not found at {args.checkpoint_path}")
@@ -50,7 +50,7 @@ def run_inference(args: argparse.Namespace):
     model = model.to(device)
     model.eval()
     del ckpt
-    print("Model loaded successfully onto the GPU.")
+    print("GHOST model loaded successfully onto the GPU.")
 
     print(f"Loading images from input directory: {args.input_dir}")
     image_names = sorted(glob.glob(os.path.join(args.input_dir, "*")))
@@ -136,7 +136,7 @@ def run_inference(args: argparse.Namespace):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run InfiniteVGGT inference from the command line.",
+        description="Run GHOST inference from the command line.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
