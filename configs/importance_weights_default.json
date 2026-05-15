@@ -1,0 +1,13 @@
+{
+  "w_camera": 0.55,
+  "w_geometry": 0.55,
+  "w_temporal": 0.25,
+  "w_saliency": 0.28,
+  "w_depth_conf": 0.45,
+  "w_pts_conf": 0.35,
+  "w_frame": 0.5,
+  "w_token": 0.5,
+  "special_token_boost": 0.3,
+  "special_token_tiebreak_eps": 1e-06,
+  "special_token_noise_scale": 0.0
+}
