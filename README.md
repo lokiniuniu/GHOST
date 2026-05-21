@@ -197,6 +197,7 @@ This project builds upon the following excellent open-source works:
 - [Point3R](https://github.com/YkiWu/Point3R)
 - [FastVGGT](https://github.com/mystorm16/FastVGGT)
 - [TTT3R](https://github.com/Inception3D/TTT3R)
+- [InfiniteVGGT](https://github.com/AutoLab-SAI-SJTU/InfiniteVGGT)
 
 Huge thanks to the open-source community ❤️
 
