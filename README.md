@@ -20,6 +20,7 @@ Shanghai Jiao Tong University
 </a>
 
 </div>
+
 **GHOST** is a causal visual geometry transformer that extends [VGGT](https://github.com/facebookresearch/vggt) with a training-free rolling KV-cache memory, enabling stable, infinite-horizon streaming 3D reconstruction from continuous image sequences. 🚀
 
 ---
