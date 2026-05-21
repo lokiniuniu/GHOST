@@ -1,5 +1,25 @@
-# 👻 GHOST
+<div align="center">
 
+# 👻 GHOST: Geometry-Hierarchical Online Streaming Token Eviction for Efficient 3D Reconstruction
+
+<br>
+
+**Leyang Chen***, **Junyi Wu***, **Zhiteng Li**, **Yulun Zhang**†
+
+Shanghai Jiao Tong University
+
+<sup>*</sup>Equal contribution &nbsp;&nbsp; | &nbsp;&nbsp; <sup>†</sup>Corresponding author: yulun100@gmail.com
+
+<br>
+
+<a href="https://arxiv.org/abs/2605.15852">
+    <img src="https://img.shields.io/badge/arXiv-2605.15852-b31b1b?style=for-the-badge&logo=arxiv">
+</a>
+<a href="https://github.com/lokiniuniu/GHOST">
+    <img src="https://img.shields.io/badge/GitHub-Code-black?style=for-the-badge&logo=github">
+</a>
+
+</div>
 **GHOST** is a causal visual geometry transformer that extends [VGGT](https://github.com/facebookresearch/vggt) with a training-free rolling KV-cache memory, enabling stable, infinite-horizon streaming 3D reconstruction from continuous image sequences. 🚀
 
 ---
