@@ -13,7 +13,7 @@ Shanghai Jiao Tong University
 <br>
 
 <a href="https://arxiv.org/abs/2605.15852">
-    <img src="https://img.shields.io/badge/arXiv-2605.15852-b31b1b?style=for-the-badge&logo=arxiv">
+    <img src="https://img.shields.io/badge/arXiv-Paper-b31b1b?style=for-the-badge&logo=arxiv">
 </a>
 <a href="https://github.com/lokiniuniu/GHOST">
     <img src="https://img.shields.io/badge/GitHub-Code-black?style=for-the-badge&logo=github">
