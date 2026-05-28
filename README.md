@@ -4,7 +4,7 @@
 
 <br>
 
-**Leyang Chen***, **Junyi Wu***, **Zhiteng Li**, **Yulun Zhang**†
+**Leyang Chen***, **Junyi Wu***, **Zhiteng Li***, **Yulun Zhang**†
 
 Shanghai Jiao Tong University
 
