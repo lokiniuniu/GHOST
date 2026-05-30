@@ -229,11 +229,11 @@ Huge thanks to the open-source community ❤️
 Citation information will be released soon.
 
 ```bibtex
-@misc{ghost2026,
-  title={GHOST},
-  author={TBD},
-  year={2026},
-  note={Citation coming soon}
+@article{chen2026ghost,
+  title={GHOST: Geometry-Hierarchical Online Streaming Token Eviction for Efficient 3D Reconstruction},
+  author={Chen, Leyang and Wu, Junyi and Li, Zhiteng and Zhang, Yulun},
+  journal={arXiv preprint arXiv:2605.15852},
+  year={2026}
 }
 ```
 
