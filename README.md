@@ -1,6 +1,6 @@
 <div align="center">
 
-# 👻 GHOST: Geometry-Hierarchical Online Streaming Token Eviction for Efficient 3D Reconstruction
+# [NeurIPS 2026] 👻 GHOST: Geometry-Hierarchical Online Streaming Token Eviction for Efficient 3D Reconstruction
 
 <br>
 
